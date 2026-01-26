@@ -1,13 +1,11 @@
 import streamlit as st
 import numpy as np
 
-# ============================================================
-# MODEL COEFFICIENTS (from your regression output)
-# ============================================================
+# Model coefficients from training output
 
 INTERCEPT = 12.0915
 
-# District coefficients (baseline is BARKING AND DAGENHAM = 0)
+# District coefficients 
 DISTRICT_COEFS = {
     "Barking and Dagenham": 0.0,
     "Barnet": 0.5061,
@@ -60,12 +58,13 @@ COEF_OLD_NEW = 0.2695  # 1 if new build
 COEF_TOTAL_FLOOR_AREA_SCALED = 0.2029
 COEF_NUMBER_HABITABLE_ROOMS_SCALED = 0.0439
 
-# You'll need to replace these with actual values from your training data
-# These are placeholders - use the mean and std from your StandardScaler
 FLOOR_AREA_MEAN = 86.99212822933303
 FLOOR_AREA_STD = 53.563372321806376
 ROOMS_MEAN = 3.936350357824273
 ROOMS_STD = 1.7875930814226857
+
+# Model error (for confidence interval)
+RMSE_LOG = 0.4313
 
 
 def predict_price(district: str, property_type: str, floor_area: float, 
@@ -99,19 +98,17 @@ def predict_price(district: str, property_type: str, floor_area: float,
     
     return price
 
-
-# ============================================================
 # STREAMLIT UI
-# ============================================================
 
 st.set_page_config(
-    page_title="London House Price Estimator",
+    page_title="London Property Price Estimator",
     page_icon="🏠",
     layout="centered"
 )
 
-st.title("🏠 London House Price Estimator")
+st.title("🏠 London Property Price Estimator")
 st.markdown("Get an instant price estimate for properties across London boroughs.")
+st.markdown("*Price estimates are generated through a proprietary ML model trained on +1M historic sale prices that were matched to official energy certificate records.*")
 
 st.divider()
 
@@ -131,7 +128,12 @@ with col1:
         index=2  # Semi-Detached House
     )
     
-    is_new_build = st.toggle("New Build", value=False)
+    is_new_build = st.radio(
+        "Property Age",
+        options=["Existing Property", "New Build"],
+        index=0,
+        horizontal=True
+    ) == "New Build"
 
 with col2:
     floor_area = st.number_input(
@@ -155,26 +157,40 @@ st.divider()
 if st.button("Get Price Estimate", type="primary", use_container_width=True):
     price = predict_price(district, property_type, floor_area, num_rooms, is_new_build)
     
+    # Calculate ±1 std dev range
+    log_price = np.log(price)
+    price_low = np.exp(log_price - RMSE_LOG)
+    price_high = np.exp(log_price + RMSE_LOG)
+    
     st.success(f"### Estimated Price: £{price:,.0f}")
+    st.markdown(f"*Likely range: £{price_low:,.0f} – £{price_high:,.0f}*")
     
     # Show breakdown
     with st.expander("See how this was calculated"):
-        st.markdown(f"""
-        **Model breakdown (log-scale):**
-        - Base price: {INTERCEPT:.4f}
-        - Borough effect ({district}): {DISTRICT_COEFS.get(district, 0):.4f}
-        - Property type effect ({property_type}): {PROPERTY_TYPE_COEFS.get(property_type, 0):.4f}
-        - New build effect: {COEF_OLD_NEW if is_new_build else 0:.4f}
-        - Floor area effect: {COEF_TOTAL_FLOOR_AREA_SCALED * (floor_area - FLOOR_AREA_MEAN) / FLOOR_AREA_STD:.4f}
-        - Rooms effect: {COEF_NUMBER_HABITABLE_ROOMS_SCALED * (num_rooms - ROOMS_MEAN) / ROOMS_STD:.4f}
+        base_price = np.exp(INTERCEPT)
+        district_multiplier = np.exp(DISTRICT_COEFS.get(district, 0))
+        property_multiplier = np.exp(PROPERTY_TYPE_COEFS.get(property_type, 0))
+        new_build_multiplier = np.exp(COEF_OLD_NEW) if is_new_build else 1.0
+        floor_area_scaled = (floor_area - FLOOR_AREA_MEAN) / FLOOR_AREA_STD
+        rooms_scaled = (num_rooms - ROOMS_MEAN) / ROOMS_STD
+        floor_area_multiplier = np.exp(COEF_TOTAL_FLOOR_AREA_SCALED * floor_area_scaled)
+        rooms_multiplier = np.exp(COEF_NUMBER_HABITABLE_ROOMS_SCALED * rooms_scaled)
         
-        The model predicts log(price), which is then converted to GBP.
+        st.markdown(f"""
+        **Price breakdown:**
+        - Base price: £{base_price:,.0f}
+        - Borough adjustment ({district}): ×{district_multiplier:.2f}
+        - Property type adjustment ({property_type}): ×{property_multiplier:.2f}
+        - New build adjustment: ×{new_build_multiplier:.2f}
+        - Floor area adjustment ({floor_area} m²): ×{floor_area_multiplier:.2f}
+        - Rooms adjustment ({num_rooms} rooms): ×{rooms_multiplier:.2f}
+        
+        **Final estimate:** £{base_price:,.0f} × {district_multiplier:.2f} × {property_multiplier:.2f} × {new_build_multiplier:.2f} × {floor_area_multiplier:.2f} × {rooms_multiplier:.2f} = **£{price:,.0f}**
         """)
 
 st.divider()
 
 st.caption(
-    "⚠️ This is a demo model for educational purposes. "
-    "Estimates are based on historical transaction data and EPC records. "
+    "⚠️ This is a demo for educational purposes. "
     "Always consult professional valuers for actual property decisions."
 )
