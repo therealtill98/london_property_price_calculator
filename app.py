@@ -1,14 +1,3 @@
-That explains it - the model is predicting for ~2009 prices by default. Adding 2025 means:
-
-```python
-sale_year_scaled = (2025 - 2008.80) / 8.69 ≈ 1.87
-```
-
-With coefficient 0.6003, that's `+1.12` in log terms, or about **3x higher prices**.
-
-Here's the updated code:
-
-```python
 import streamlit as st
 import numpy as np
 
@@ -219,4 +208,3 @@ st.caption(
     "⚠️ This is a demo for educational purposes. "
     "Always consult professional valuers for actual property decisions."
 )
-```
