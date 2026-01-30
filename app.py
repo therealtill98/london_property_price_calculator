@@ -111,7 +111,7 @@ st.set_page_config(
 
 st.title("🏠 London Property Price Estimator")
 st.markdown("Get an instant price estimate for properties across London boroughs.")
-st.markdown("*Price estimates are generated through a proprietary ML model trained on +1M historic sale prices that were matched to official energy certificate records.*")
+st.markdown("*Price estimates are generated through a proprietary ML model trained on over 1 million historic sale prices.*")
 
 st.divider()
 
@@ -181,6 +181,7 @@ if st.button("Get Price Estimate", type="primary", use_container_width=True):
         rooms_multiplier = np.exp(COEF_NUMBER_HABITABLE_ROOMS_SCALED * rooms_scaled)
         
         st.markdown(f"""
+        We matched 1.1 million historic transactions to official Energy Performance Certificates and enriched them with neighbourhood metrics like crime rates, tube proximity, and deprivation indices. The resulting 34-feature model explains 82% of price variation across London boroughs.
         **Price breakdown:**
         - Base price: £{base_price:,.0f}
         - Borough adjustment ({district}): ×{district_multiplier:.2f}
