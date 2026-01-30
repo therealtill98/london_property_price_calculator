@@ -1,3 +1,14 @@
+That explains it - the model is predicting for ~2009 prices by default. Adding 2025 means:
+
+```python
+sale_year_scaled = (2025 - 2008.80) / 8.69 ≈ 1.87
+```
+
+With coefficient 0.6003, that's `+1.12` in log terms, or about **3x higher prices**.
+
+Here's the updated code:
+
+```python
 import streamlit as st
 import numpy as np
 
@@ -58,12 +69,15 @@ PROPERTY_TYPE_COEFS = {
 COEF_OLD_NEW = 0.2060
 COEF_TOTAL_FLOOR_AREA_SCALED = 0.3229
 COEF_NUMBER_HABITABLE_ROOMS_SCALED = 0.0038
+COEF_SALE_YEAR_SCALED = 0.6003
 
 # Scaling parameters (floor area is log-transformed before scaling)
 FLOOR_AREA_LOG_MEAN = 4.386511603767719
 FLOOR_AREA_LOG_STD = 0.47257771853330777
 ROOMS_MEAN = 3.9727626069998228
 ROOMS_STD = 1.7406400213620896
+SALE_YEAR_MEAN = 2008.7952931442833
+SALE_YEAR_STD = 8.688165520246507
 
 # Model error (for confidence interval)
 RMSE_LOG = 0.3807
@@ -88,6 +102,10 @@ def predict_price(district: str, property_type: str, floor_area: float,
     if is_new_build:
         log_price += COEF_OLD_NEW
     
+    # Add sale year effect (assume 2025)
+    sale_year_scaled = (2025 - SALE_YEAR_MEAN) / SALE_YEAR_STD
+    log_price += COEF_SALE_YEAR_SCALED * sale_year_scaled
+    
     # Add scaled continuous variables (floor area is log-transformed first)
     floor_area_log = np.log1p(floor_area)
     floor_area_scaled = (floor_area_log - FLOOR_AREA_LOG_MEAN) / FLOOR_AREA_LOG_STD
@@ -111,7 +129,7 @@ st.set_page_config(
 
 st.title("🏠 London Property Price Estimator")
 st.markdown("Get an instant price estimate for properties across London boroughs.")
-st.markdown("*Price estimates are generated through a proprietary ML model trained on over 1 million historic sale prices.*")
+st.markdown("*Trained on 1.1 million London transactions matched to official EPC records, enriched with neighbourhood quality metrics, and powered by 34 features—our model captures the fundamentals that drive property values across the capital.*")
 
 st.divider()
 
@@ -174,6 +192,8 @@ if st.button("Get Price Estimate", type="primary", use_container_width=True):
         district_multiplier = np.exp(DISTRICT_COEFS.get(district, 0))
         property_multiplier = np.exp(PROPERTY_TYPE_COEFS.get(property_type, 0))
         new_build_multiplier = np.exp(COEF_OLD_NEW) if is_new_build else 1.0
+        sale_year_scaled = (2025 - SALE_YEAR_MEAN) / SALE_YEAR_STD
+        sale_year_multiplier = np.exp(COEF_SALE_YEAR_SCALED * sale_year_scaled)
         floor_area_log = np.log1p(floor_area)
         floor_area_scaled = (floor_area_log - FLOOR_AREA_LOG_MEAN) / FLOOR_AREA_LOG_STD
         rooms_scaled = (num_rooms - ROOMS_MEAN) / ROOMS_STD
@@ -181,16 +201,16 @@ if st.button("Get Price Estimate", type="primary", use_container_width=True):
         rooms_multiplier = np.exp(COEF_NUMBER_HABITABLE_ROOMS_SCALED * rooms_scaled)
         
         st.markdown(f"""
-        We matched 1.1 million historic transactions to official Energy Performance Certificates and enriched them with neighbourhood metrics like crime rates, tube proximity, and deprivation indices. The resulting 34-feature model explains 82% of price variation across London boroughs.
         **Price breakdown:**
         - Base price: £{base_price:,.0f}
         - Borough adjustment ({district}): ×{district_multiplier:.2f}
         - Property type adjustment ({property_type}): ×{property_multiplier:.2f}
         - New build adjustment: ×{new_build_multiplier:.2f}
+        - Sale year adjustment (2025): ×{sale_year_multiplier:.2f}
         - Floor area adjustment ({floor_area} m²): ×{floor_area_multiplier:.2f}
         - Rooms adjustment ({num_rooms} rooms): ×{rooms_multiplier:.2f}
         
-        **Final estimate:** £{base_price:,.0f} × {district_multiplier:.2f} × {property_multiplier:.2f} × {new_build_multiplier:.2f} × {floor_area_multiplier:.2f} × {rooms_multiplier:.2f} = **£{price:,.0f}**
+        **Final estimate:** £{base_price:,.0f} × {district_multiplier:.2f} × {property_multiplier:.2f} × {new_build_multiplier:.2f} × {sale_year_multiplier:.2f} × {floor_area_multiplier:.2f} × {rooms_multiplier:.2f} = **£{price:,.0f}**
         """)
 
 st.divider()
@@ -199,3 +219,4 @@ st.caption(
     "⚠️ This is a demo for educational purposes. "
     "Always consult professional valuers for actual property decisions."
 )
+```
