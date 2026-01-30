@@ -118,7 +118,7 @@ st.set_page_config(
 
 st.title("🏠 London Property Price Estimator")
 st.markdown("Get an instant price estimate for properties across London boroughs.")
-st.markdown("*Trained on 1.1 million London transactions matched to official EPC records, enriched with neighbourhood quality metrics, and powered by 34 features—our model captures the fundamentals that drive property values across the capital.*")
+st.markdown("*Price estimates are generated through a proprietary ML model trained on +1M historic sale prices that were matched to official energy certificate records.*")
 
 st.divider()
 
